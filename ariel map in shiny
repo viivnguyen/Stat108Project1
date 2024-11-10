@@ -2,8 +2,47 @@ library(shiny)
 library(mosaic)
 library(tidyverse)
 library(glue)
+library(tidyverse)
+library(sf)
+library(leaflet)
 
-# app.R (UI section)
+preRoedata <- read_csv("OG_NationalAndStatePregnancy_PreDobbs_1988-2020.csv")
+postRoedata <- read_csv("OG_MonthlyAbortionProvisionMonthly_2023-2024.csv")
+
+preRoedata1 <- preRoedata %>%
+  select(state, year, abortionstotal, abortionratetotal, abortionratiototal)
+
+postRoedata$year <- year(mdy(postRoedata$month))
+
+postRoedata1 <- postRoedata %>%
+  select(state, year, median) %>%
+  group_by(state, year) %>%
+  summarize(abortionstotal = sum(median))
+
+abortion_data <- full_join(preRoedata1, postRoedata1, by = c("state", "year"))
+
+abortion_data1 <- abortion_data %>%
+  mutate(abortionstotal = coalesce(abortionstotal.x, abortionstotal.y)) %>%
+  select(-abortionstotal.x, -abortionstotal.y) %>%
+  arrange(state, year)
+
+# Data (to get geometry variable)
+states <- sf::read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson")
+
+# Merge on name/state name variable
+statenames <- read_csv("state_names.csv")
+
+statenames <- statenames %>%
+  select("State", "Alpha code")
+
+states <- full_join(states, statenames, by = c("name" = "State"))
+
+abortion_data_geom <- left_join(abortion_data1, states, by = c("state" = "Alpha code"))
+
+# Ensure geometry column exists and convert abortion_data_geom to an sf object
+abortion_data_geom <- st_as_sf(abortion_data_geom)
+  
+# UI
 ui <- fluidPage(
   titlePanel("Abortion Data by State"),
   
@@ -27,54 +66,24 @@ ui <- fluidPage(
 )
 
 
-# app.R (Server section)
+# Server
 server <- function(input, output, session) {
   
-  # Load Data
-  preRoedata <- read_csv("OG_NationalAndStatePregnancy_PreDobbs_1988-2020.csv")
-  postRoedata <- read_csv("OG_MonthlyAbortionProvisionMonthly_2023-2024.csv")
-  statenames <- read_csv("state_names.csv")
-  
-  # Data Preparation
-  preRoedata1 <- preRoedata %>%
-    select(state, year, abortionstotal, abortionratetotal)
-  
-  postRoedata$year <- lubridate::year(lubridate::mdy(postRoedata$month))
-  
-  postRoedata1 <- postRoedata %>%
-    select(state, year, median) %>%
-    group_by(state, year) %>%
-    summarize(abortionstotal = sum(median))
-  
-  abortion_data <- full_join(preRoedata1, postRoedata1, by = c("state", "year"))
-  
-  abortion_data1 <- abortion_data %>%
-    mutate(abortionstotal = coalesce(abortionstotal.x, abortionstotal.y)) %>%
-    select(state, year, abortionstotal, abortionratetotal) %>%
-    arrange(state, year)
-  
-  states <- sf::read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson")
-  states <- full_join(states, statenames, by = c("name" = "State"))
-  
-  abortion_data_geom <- left_join(abortion_data1, states, by = c("state" = "Alpha code.x"))
-  abortion_data_geom <- st_as_sf(abortion_data_geom) %>%
-    st_transform(crs = 4326)
-  
   # Define color bins
-  bins <- c(0, 10, 20, 50, 100, 200, 500, 1000, Inf)
+  bins <- c(0, 5, 10, 15, 20, 25, 30, 35, Inf)
   
   output$map <- renderLeaflet({
     req(input$year)
     
-    # Filter data based on selected year
+    
     abortion_data_year <- abortion_data_geom %>%
       filter(year == input$year)
     
     # Create color palette
-    pal <- colorBin(input$colorScheme, domain = abortion_data_year$abortionratetotal, bins = bins)
+    pal <- colorBin("YlOrRd", domain = abortion_data_year$abortionratetotal, bins = bins)
     
     labels <- sprintf(
-      "<strong>%s</strong><br/>%g abortions / 1000 live births",
+      "<strong>%s</strong><br/>%g abortions",
       abortion_data_year$name, abortion_data_year$abortionratetotal
     ) %>% lapply(htmltools::HTML)
     
