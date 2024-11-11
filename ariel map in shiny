@@ -6,9 +6,11 @@ library(sf)
 library(leaflet)
 library(DT)
 
+# Load data
 preRoedata <- read_csv("OG_NationalAndStatePregnancy_PreDobbs_1988-2020.csv")
 postRoedata <- read_csv("OG_MonthlyAbortionProvisionMonthly_2023-2024.csv")
 
+# Pre-process data
 preRoedata1 <- preRoedata %>%
   select(state, year, abortionstotal, abortionratetotal, abortionratiototal)
 
@@ -26,22 +28,21 @@ abortion_data1 <- abortion_data %>%
   select(-abortionstotal.x, -abortionstotal.y) %>%
   arrange(state, year)
 
-# Data (to get geometry variable)
+# Load state geometry data
 states <- sf::read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson")
 
-# Merge on name/state name variable
-statenames <- read_csv("state_names.csv")
-
-statenames <- statenames %>%
+# Merge state names
+statenames <- read_csv("state_names.csv") %>%
   select("State", "Alpha code")
 
 states <- full_join(states, statenames, by = c("name" = "State"))
 
+# Merge geometry with abortion data
 abortion_data_geom <- left_join(abortion_data1, states, by = c("state" = "Alpha code"))
 
-# Ensure geometry column exists and convert abortion_data_geom to an sf object
+# Ensure geometry column exists and convert to sf object
 abortion_data_geom <- st_as_sf(abortion_data_geom)
-  
+
 # UI
 ui <- fluidPage(
   titlePanel("Abortion Data by State"),
@@ -49,94 +50,9 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       sliderInput("year", "Select Year:",
-                  min = min(preRoedata$year, postRoedata$year),
-                  max = max(preRoedata$year, postRoedata$year),
-                  value = min(preRoedata$year, postRoedata$year),
-                  step = 1,
-                  sep = ""),
-      
-      selectInput("state", "State:",
-                  choices = unique(abortion_data_geom$name)),
-      
-      hr(),
-      
-      helpText("This dashboard visualizes abortion data across the United States. Use the slider to select a year and the dropdown to choose a specific state.")
-    ),
-    
-    mainPanel(
-      tabsetPanel(
-        tabPanel("Map", 
-                 leafletOutput("map", height = "600px"),
-                 hr(),
-                 h4("About the Map"),
-                 p("This map shows the abortion rate per 1,000 women aged 15-44 for each state. Darker colors indicate higher rates.")
-        ),
-        tabPanel("Data Table", 
-                 h3("State-by-State Abortion Data"),
-                 DT::dataTableOutput("stateTable"),
-                 hr(),
-                 h4("About the Data"),
-                 p("This table provides detailed abortion statistics for each state in the selected year. You can sort and search the data using the table controls.")
-        )
-      )
-    )
-  )
-)
-
-library(shiny)
-library(mosaic)
-library(tidyverse)
-library(glue)
-library(sf)
-library(leaflet)
-library(DT)
-
-preRoedata <- read_csv("OG_NationalAndStatePregnancy_PreDobbs_1988-2020.csv")
-postRoedata <- read_csv("OG_MonthlyAbortionProvisionMonthly_2023-2024.csv")
-
-preRoedata1 <- preRoedata %>%
-  select(state, year, abortionstotal, abortionratetotal, abortionratiototal)
-
-postRoedata$year <- year(mdy(postRoedata$month))
-
-postRoedata1 <- postRoedata %>%
-  select(state, year, median) %>%
-  group_by(state, year) %>%
-  summarize(abortionstotal = sum(median))
-
-abortion_data <- full_join(preRoedata1, postRoedata1, by = c("state", "year"))
-
-abortion_data1 <- abortion_data %>%
-  mutate(abortionstotal = coalesce(abortionstotal.x, abortionstotal.y)) %>%
-  select(-abortionstotal.x, -abortionstotal.y) %>%
-  arrange(state, year)
-
-# Data (to get geometry variable)
-states <- sf::read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson")
-
-# Merge on name/state name variable
-statenames <- read_csv("state_names.csv")
-
-statenames <- statenames %>%
-  select("State", "Alpha code")
-
-states <- full_join(states, statenames, by = c("name" = "State"))
-
-abortion_data_geom <- left_join(abortion_data1, states, by = c("state" = "Alpha code"))
-
-# Ensure geometry column exists and convert abortion_data_geom to an sf object
-abortion_data_geom <- st_as_sf(abortion_data_geom)
-  
-# UI
-ui <- fluidPage(
-  titlePanel("Abortion Data by State"),
-  
-  sidebarLayout(
-    sidebarPanel(
-      sliderInput("year", "Select Year:",
-                  min = min(preRoedata$year, postRoedata$year),
-                  max = max(preRoedata$year, postRoedata$year),
-                  value = min(preRoedata$year, postRoedata$year),
+                  min = min(preRoedata$year),
+                  max = max(postRoedata$year),
+                  value = min(preRoedata$year),
                   step = 1,
                   sep = ""),
       
@@ -177,7 +93,7 @@ server <- function(input, output, session) {
   filtered_data <- reactive({
     abortion_data_geom %>%
       filter(year == input$year) %>%
-      st_drop_geometry()  # Drop the geometry column for non-map use cases
+      st_drop_geometry() # Drop geometry column for non-map use cases
   })
   
   # Map rendering
@@ -195,10 +111,8 @@ server <- function(input, output, session) {
     ) %>% lapply(htmltools::HTML)
     
     leaflet(abortion_data_year) %>%
-      setView(-96, 37.8, 4) %>%
-      addProviderTiles("MapBox", options = providerTileOptions(
-        id = "mapbox.light",
-        accessToken = Sys.getenv('MAPBOX_ACCESS_TOKEN'))) %>%
+      setView(-96, 37.8, zoom = 4) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
       addPolygons(
         fillColor = ~pal(abortionratetotal),
         weight = 2,
@@ -217,21 +131,21 @@ server <- function(input, output, session) {
           style = list("font-weight" = "normal", padding = "3px 8px"),
           textsize = "15px",
           direction = "auto")) %>%
-      addLegend(pal = pal, values = ~abortionratetotal, opacity = 0.7, title = "Abortion Rate",
-                position = "bottomright")
+      addLegend(pal = pal, values = ~abortionratetotal, opacity = 0.7,
+                title = "Abortion Rate", position = "bottomright")
   })
   
   # Data table rendering
   output$stateTable <- DT::renderDataTable({
-    # Exclude the geometry column by using st_drop_geometry()
     data <- filtered_data() %>%
       select(name, abortionratetotal, abortionstotal, abortionratiototal) %>%
-      rename("State" = name,
-             "Abortion Rate" = abortionratetotal,
-             "Total Abortions" = abortionstotal,
-             "Abortion Ratio" = abortionratiototal)
+      rename(State = name,
+             `Abortion Rate` = abortionratetotal,
+             `Total Abortions` = abortionstotal,
+             `Abortion Ratio` = abortionratiototal)
     
     DT::datatable(data, options = list(pageLength = 10))
   })
 }
+
 shinyApp(ui = ui, server = server)
