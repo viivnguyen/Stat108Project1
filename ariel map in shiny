@@ -68,9 +68,9 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       sliderInput("year", "Select Year:",
-                  min = min(abortion_data1$year),
-                  max = max(abortion_data1$year),
-                  value = min(abortion_data1$year),
+                  min = 1988,
+                  max = max(postRoedata$year),
+                  value = 1988,
                   step = 1,
                   sep = ""),
       
