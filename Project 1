@@ -14,36 +14,18 @@ postRoedata <- read_csv("MonthlyAbortionProvisionMonthly_2023-2024.csv")
 # Data Wrangling
 # Pre-process data
 preRoedata1 <- preRoedata %>%
-  select(state, year, abortionstotal, abortionratetotal, abortionratiototal) %>%
-  mutate(
-    clinical_abortions = abortionstotal * 0.6,  # Adjust these proportions based on actual data
-    medical_abortions = abortionstotal * 0.4,
-    restriction_level = case_when(
-      state %in% c("TX", "MS", "AL", "LA", "KY", "WV") ~ "high",
-      state %in% c("FL", "GA", "SC", "NC", "OH", "IN") ~ "moderate",
-      TRUE ~ "low"
-    )
-  )
+  select(state, year, abortionstotal, abortionratetotal, abortionratiototal)
 
 postRoedata$year <- year(mdy(postRoedata$month))
 
 postRoedata1 <- postRoedata %>%
   select(state, year, median) %>%
   group_by(state, year) %>%
-  summarize(abortionstotal = sum(median)) %>%
-  mutate(
-    clinical_abortions = abortionstotal * 0.55,  # Adjust these proportions based on actual data
-    medical_abortions = abortionstotal * 0.45,
-    restriction_level = case_when(
-      state %in% c("TX", "MS", "AL", "LA", "KY", "WV") ~ "high",
-      state %in% c("FL", "GA", "SC", "NC", "OH", "IN") ~ "moderate",
-      TRUE ~ "low"
-    )
-  )
+  summarize(abortionstotal = sum(median))
 
 abortion_data <- full_join(preRoedata1, postRoedata1, by = c("state", "year"))
 
-abortion_data <- abortion_data %>%
+abortion_data1 <- abortion_data %>%
   mutate(abortionstotal = coalesce(abortionstotal.x, abortionstotal.y)) %>%
   select(-abortionstotal.x, -abortionstotal.y) %>%
   arrange(state, year)
@@ -73,25 +55,20 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       sliderInput("year", "Select Year:",
-                  min = min(preRoedata$year),
-                  max = max(postRoedata$year),
-                  value = min(preRoedata$year),
+                  min = min(abortion_data1$year),
+                  max = max(abortion_data1$year),
+                  value = min(abortion_data1$year),
                   step = 1,
                   sep = ""),
       
       selectInput("state", "State:",
                   choices = unique(abortion_data_geom$name)),
       
-      selectInput("abortionType", "Abortion Type:",
-                  choices = c("All Types" = "all",
-                             "Clinical" = "clinical",
-                             "Medical (Pill)" = "medical")),
-      
       selectInput("restrictionLevel", "Restriction Level:",
                   choices = c("All Levels" = "all",
-                             "Highly Restrictive" = "high",
-                             "Moderately Restrictive" = "moderate",
-                             "Less Restrictive" = "low")),
+                              "Highly Restrictive" = "high",
+                              "Moderately Restrictive" = "moderate",
+                              "Less Restrictive" = "low")),
       
       hr(),
       
@@ -99,16 +76,14 @@ ui <- fluidPage(
     ),
     
     mainPanel(
-     tabsetPanel(
+      tabsetPanel(
         tabPanel("Map", 
                  checkboxGroupInput("mapLayers", "Map Layers:",
-                                  choices = c(
-                                    "Total Abortions" = "total",
-                                    "Clinical Abortions" = "clinical",
-                                    "Medical Abortions" = "medical",
-                                    "Restriction Levels" = "restrictions"
-                                  ),
-                                  selected = "total"),
+                                    choices = c(
+                                      "Total Abortions" = "total",
+                                      "Restriction Levels" = "restrictions"
+                                    ),
+                                    selected = "total"),
                  leafletOutput("map", height = "600px"),
                  hr(),
                  h4("About the Map"),
@@ -133,111 +108,96 @@ server <- function(input, output, session) {
   
   bins <- c(0, 5, 10, 15, 20, 25, 30, 35, Inf)
   
-  # Reactive filtered data based on selected year
+  # Reactive filtered data based on selected year and restriction level
   filtered_data <- reactive({
-    req(input$year) 
+    req(input$year)
+    
+    # Filter data based on year
     filtered <- abortion_data_geom %>%
       filter(year == input$year)
+    
+    # Check if restriction level input is available and if it's not "all"
+    req(input$restrictionLevel)
+    if (input$restrictionLevel != "all") {
+      filtered <- filtered %>%
+        filter(restriction_level == input$restrictionLevel)
+    }
+    
+    # Return NULL if no rows are left after filtering
     if (nrow(filtered) == 0) {
       return(NULL)
     }
     
     return(filtered)
   })
-
- # Filter by abortion type if not "all"
-    if (input$abortionType != "all") {
-      data <- data %>%
-        mutate(selected_abortions = case_when(
-          input$abortionType == "clinical" ~ clinical_abortions,
-          input$abortionType == "medical" ~ medical_abortions,
-          TRUE ~ abortionstotal
-        ))
-    } else {
-      data <- data %>%
-        mutate(selected_abortions = abortionstotal)
-    }
-    
-    # Filter by restriction level if not "all"
-    if (input$restrictionLevel != "all") {
-      data <- data %>%
-        filter(restriction_level == input$restrictionLevel)
-    }
-    
-    st_drop_geometry(data)
-  })
-
+  
   # Map rendering
   output$map <- renderLeaflet({
-    req(input$year)
-    
-    abortion_data_year <- abortion_data_geom %>%
-      filter(year == input$year)
+    # Get the filtered data using reactive
+    data <- filtered_data()
     
     # Check if the filtered data is NULL (meaning no data available for that year)
-    if (is.null(abortion_data_year) || nrow(abortion_data_year) == 0) {
+    if (is.null(data)) {
       # If no data, show an empty Leaflet map with a warning label
       leaflet() %>%
         setView(-96, 37.8, zoom = 4) %>%
         addProviderTiles(providers$CartoDB.Positron) %>%
-        addControl(html = "<b>No data available for the selected year. Please choose a different year.</b>", 
+        addControl(html = "<b>No data available for the selected year and restrictions. Please choose different filters.</b>", 
                    position = "topright", 
                    className = "info-control")
     } else {
-      pal_total <- colorBin("YlOrRd", domain = abortion_data_year$abortionratetotal, bins = bins)
-    pal_clinical <- colorBin("Blues", domain = abortion_data_year$clinical_abortions, bins = bins)
-    pal_medical <- colorBin("Greens", domain = abortion_data_year$medical_abortions, bins = bins)
-    pal_restrictions <- colorFactor(
-      palette = c("red", "orange", "yellow"),
-      domain = c("high", "moderate", "low")
-    )
+      # Proceed to create the map with filtered data
+      pal <- colorBin("YlOrRd", domain = data$abortionratetotal, bins = bins)
       
-    labels <- sprintf(
-      "<strong>%s</strong><br/>%g abortions per 1,000 women",
-      abortion_data_year$name, abortion_data_year$abortionratetotal
-    ) %>% lapply(htmltools::HTML)
-    
-    leaflet(abortion_data_year) %>%
-      setView(-96, 37.8, zoom = 4) %>%
-      addProviderTiles(providers$CartoDB.Positron) %>%
-      addPolygons(
-        fillColor = ~pal(abortionratetotal),
-        weight = 2,
-        opacity = 1,
-        color = "white",
-        dashArray = "3",
-        fillOpacity = 0.7,
-        highlightOptions = highlightOptions(
-          weight = 5,
-          color = "#666",
-          dashArray = "",
+      labels <- sprintf(
+        "<strong>%s</strong><br/>%g abortions per 1,000 women",
+        data$name, data$abortionratetotal
+      ) %>% lapply(htmltools::HTML)
+      
+      leaflet(data) %>%
+        setView(-96, 37.8, zoom = 4) %>%
+        addProviderTiles(providers$CartoDB.Positron) %>%
+        addPolygons(
+          fillColor = ~pal(abortionratetotal),
+          weight = 2,
+          opacity = 1,
+          color = "white",
+          dashArray = "3",
           fillOpacity = 0.7,
-          bringToFront = TRUE),
-        label = labels,
-        labelOptions = labelOptions(
-          style = list("font-weight" = "normal", padding = "3px 8px"),
-          textsize = "15px",
-          direction = "auto")) %>%
-      addLegend(pal = pal, values = ~abortionratetotal, opacity = 0.7,
-                title = "Abortion Rate", position = "bottomright")
+          highlightOptions = highlightOptions(
+            weight = 5,
+            color = "#666",
+            dashArray = "",
+            fillOpacity = 0.7,
+            bringToFront = TRUE),
+          label = labels,
+          labelOptions = labelOptions(
+            style = list("font-weight" = "normal", padding = "3px 8px"),
+            textsize = "15px",
+            direction = "auto")) %>%
+        addLegend(pal = pal, values = ~abortionratetotal, opacity = 0.7,
+                  title = "Abortion Rate", position = "bottomright")
     }
   })
   
   # Data table rendering
   output$stateTable <- DT::renderDataTable({
-    data <- filtered_data() # Check if the filtered data is NULL (meaning no data available for that year)
-   
-     if (is.null(data)) {
+    # Get the filtered data using reactive
+    data <- filtered_data()
+    
+    # Check if the filtered data is NULL (meaning no data available for that year)
+    if (is.null(data)) {
       # Return an empty data table with an appropriate message
       return(DT::datatable(
         data.frame(
-          Message = "No data available for the selected year. Please choose a different year."
+          Message = "No data available for the selected year and restrictions. Please choose different filters."
         ),
         options = list(pageLength = 1),
         rownames = FALSE
       ))
     }
     
+    # If data exists, create the data table
     data %>%
       st_drop_geometry() %>%  # Drop geometry column for non-map use cases
       select(name, abortionratetotal, abortionstotal, abortionratiototal) %>%
