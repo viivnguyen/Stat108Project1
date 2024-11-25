@@ -61,6 +61,9 @@ abortion_data_geom <- left_join(abortion_data1, states, by = c("state" = "Alpha 
 # Ensure geometry column exists and convert to sf object
 abortion_data_geom <- st_as_sf(abortion_data_geom)
 
+# Get the actual years present in the data
+available_years <- sort(unique(abortion_data1$year))
+
 # UI
 ui <- fluidPage(
   titlePanel("Abortion Data by State"),
@@ -68,10 +71,11 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       sliderInput("year", "Select Year:",
-                  min = min(abortion_data1$year),
-                  max = max(abortion_data1$year),
-                  value = min(abortion_data1$year),
-                  step = 1,
+                  min = min(available_years),
+                  max = max(available_years),
+                  value = min(available_years),
+                  step = NULL,  # Remove step
+                  choices = available_years,  # Only show available years
                   sep = ""),
       
       selectInput("state", "State:",
@@ -79,14 +83,14 @@ ui <- fluidPage(
       
       selectInput("abortionType", "Abortion Type:",
                   choices = c("All Types" = "all",
-                              "Clinical" = "clinical",
-                              "Medical (Pill)" = "medical")),
+                             "Clinical" = "clinical",
+                             "Medical (Pill)" = "medical")),
       
       selectInput("restrictionLevel", "Restriction Level:",
                   choices = c("All Levels" = "all",
-                              "Highly Restrictive" = "high",
-                              "Moderately Restrictive" = "moderate",
-                              "Less Restrictive" = "low")),
+                             "Highly Restrictive" = "high",
+                             "Moderately Restrictive" = "moderate",
+                             "Less Restrictive" = "low")),
       
       hr(),
       
@@ -97,13 +101,13 @@ ui <- fluidPage(
       tabsetPanel(
         tabPanel("Map", 
                  checkboxGroupInput("mapLayers", "Map Layers:",
-                                    choices = c(
-                                      "Total Abortions" = "total",
-                                      "Clinical Abortions" = "clinical",
-                                      "Medical Abortions" = "medical",
-                                      "Restriction Levels" = "restrictions"
-                                    ),
-                                    selected = "total"),
+                                  choices = c(
+                                    "Total Abortions" = "total",
+                                    "Clinical Abortions" = "clinical",
+                                    "Medical Abortions" = "medical",
+                                    "Restriction Levels" = "restrictions"
+                                  ),
+                                  selected = "total"),
                  leafletOutput("map", height = "600px"),
                  hr(),
                  h4("About the Map"),

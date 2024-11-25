@@ -61,6 +61,9 @@ abortion_data_geom <- left_join(abortion_data1, states, by = c("state" = "Alpha 
 # Ensure geometry column exists and convert to sf object
 abortion_data_geom <- st_as_sf(abortion_data_geom)
 
+# Get the actual years present in the data
+available_years <- sort(unique(abortion_data1$year))
+
 # UI
 ui <- fluidPage(
   titlePanel("Abortion Data by State"),
@@ -68,10 +71,11 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       sliderInput("year", "Select Year:",
-                  min = 1988,
-                  max = max(postRoedata$year),
-                  value = 1988,
-                  step = 1,
+                  min = min(available_years),
+                  max = max(available_years),
+                  value = min(available_years),
+                  step = NULL,  # Remove step
+                  choices = available_years,  # Only show available years
                   sep = ""),
       
       selectInput("state", "State:",
