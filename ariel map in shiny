@@ -242,14 +242,26 @@ server <- function(input, output, session) {
   # Data table rendering
   output$stateTable <- DT::renderDataTable({
     data <- filtered_data() %>%
-      select(name, selected_abortions, restriction_level) %>%
+      select(name, abortionstotal, clinical_abortions, medical_abortions, restriction_level) %>%
       rename(
-        State = name,
-        `Abortions` = selected_abortions,
-        `Restriction Level` = restriction_level
-      )
+        "State" = name,
+        "Total Abortions" = abortionstotal,
+        "Clinical Abortions" = clinical_abortions,
+        "Medical Abortions" = medical_abortions,
+        "Restriction Level" = restriction_level
+      ) %>%
+      # Remove any NA values or format them as needed
+      mutate(across(where(is.numeric), ~replace_na(., 0)))
     
-    DT::datatable(data, options = list(pageLength = 10))
+    DT::datatable(
+      data,
+      options = list(
+        pageLength = 10,
+        scrollX = TRUE,
+        dom = 'Bfrtip'
+      ),
+      rownames = FALSE
+    )
   })
 }
 
