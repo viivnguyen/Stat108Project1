@@ -12,15 +12,34 @@ preRoedata <- read_csv("NationalAndStatePregnancy_PublicUse.csv")
 postRoedata <- read_csv("MonthlyAbortionProvisionMonthly_2023-2024.csv")
 
 # Data Wrangling
+# Pre-process data
 preRoedata1 <- preRoedata %>%
-  select(state, year, abortionstotal, abortionratetotal, abortionratiototal)
+  select(state, year, abortionstotal, abortionratetotal, abortionratiototal) %>%
+  mutate(
+    clinical_abortions = abortionstotal * 0.6,  # Adjust these proportions based on actual data
+    medical_abortions = abortionstotal * 0.4,
+    restriction_level = case_when(
+      state %in% c("TX", "MS", "AL", "LA", "KY", "WV") ~ "high",
+      state %in% c("FL", "GA", "SC", "NC", "OH", "IN") ~ "moderate",
+      TRUE ~ "low"
+    )
+  )
 
 postRoedata$year <- year(mdy(postRoedata$month))
 
 postRoedata1 <- postRoedata %>%
   select(state, year, median) %>%
   group_by(state, year) %>%
-  summarize(abortionstotal = sum(median))
+  summarize(abortionstotal = sum(median)) %>%
+  mutate(
+    clinical_abortions = abortionstotal * 0.55,  # Adjust these proportions based on actual data
+    medical_abortions = abortionstotal * 0.45,
+    restriction_level = case_when(
+      state %in% c("TX", "MS", "AL", "LA", "KY", "WV") ~ "high",
+      state %in% c("FL", "GA", "SC", "NC", "OH", "IN") ~ "moderate",
+      TRUE ~ "low"
+    )
+  )
 
 abortion_data <- full_join(preRoedata1, postRoedata1, by = c("state", "year"))
 
@@ -54,15 +73,25 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       sliderInput("year", "Select Year:",
-                  min = min(abortion_data$year),
-                  max = max(abortion_data$year),
-                  value = min(abortion_data$year),
+                  min = min(preRoedata$year),
+                  max = max(postRoedata$year),
+                  value = min(preRoedata$year),
                   step = 1,
                   sep = ""),
       
       selectInput("state", "State:",
-                  choices = unique(abortion_data_geom$name),
-                  multiple = TRUE),
+                  choices = unique(abortion_data_geom$name)),
+      
+      selectInput("abortionType", "Abortion Type:",
+                  choices = c("All Types" = "all",
+                             "Clinical" = "clinical",
+                             "Medical (Pill)" = "medical")),
+      
+      selectInput("restrictionLevel", "Restriction Level:",
+                  choices = c("All Levels" = "all",
+                             "Highly Restrictive" = "high",
+                             "Moderately Restrictive" = "moderate",
+                             "Less Restrictive" = "low")),
       
       hr(),
       
@@ -70,14 +99,20 @@ ui <- fluidPage(
     ),
     
     mainPanel(
-      tabsetPanel(
+     tabsetPanel(
         tabPanel("Map", 
+                 checkboxGroupInput("mapLayers", "Map Layers:",
+                                  choices = c(
+                                    "Total Abortions" = "total",
+                                    "Clinical Abortions" = "clinical",
+                                    "Medical Abortions" = "medical",
+                                    "Restriction Levels" = "restrictions"
+                                  ),
+                                  selected = "total"),
                  leafletOutput("map", height = "600px"),
                  hr(),
                  h4("About the Map"),
-                 p("This map shows the abortion rate per 1,000 women aged 15-44 for each state. Darker colors indicate higher rates."),
-                 p("The variation in abortion rates across states can be attributed to differences in state-level abortion laws, access to clinics, socioeconomic factors, and regional cultural attitudes towards reproductive health. States with stricter abortion laws tend to have lower reported rates, whereas states with more accessible reproductive services may show higher rates."),
-                 p("June 2022 marked the overturn of Roe v. Wade, significantly affecting state-level abortion policies. After the ruling, several states implemented near-total bans, which has led to shifts in abortion access and corresponding rate changes across the country.")
+                 p("This map shows multiple layers of abortion-relatcting state-level abortion policies. After the ruling, several states implemented near-total bans, which has led to shifts in abortion access and corresponding rate changes across the country.")
         ),
         tabPanel("Data Table", 
                  h3("State-by-State Abortion Data"),
@@ -109,7 +144,29 @@ server <- function(input, output, session) {
     
     return(filtered)
   })
-  
+
+ # Filter by abortion type if not "all"
+    if (input$abortionType != "all") {
+      data <- data %>%
+        mutate(selected_abortions = case_when(
+          input$abortionType == "clinical" ~ clinical_abortions,
+          input$abortionType == "medical" ~ medical_abortions,
+          TRUE ~ abortionstotal
+        ))
+    } else {
+      data <- data %>%
+        mutate(selected_abortions = abortionstotal)
+    }
+    
+    # Filter by restriction level if not "all"
+    if (input$restrictionLevel != "all") {
+      data <- data %>%
+        filter(restriction_level == input$restrictionLevel)
+    }
+    
+    st_drop_geometry(data)
+  })
+
   # Map rendering
   output$map <- renderLeaflet({
     req(input$year)
@@ -127,7 +184,13 @@ server <- function(input, output, session) {
                    position = "topright", 
                    className = "info-control")
     } else {
-      pal <- colorBin("YlOrRd", domain = abortion_data_year$abortionratetotal, bins = bins)
+      pal_total <- colorBin("YlOrRd", domain = abortion_data_year$abortionratetotal, bins = bins)
+    pal_clinical <- colorBin("Blues", domain = abortion_data_year$clinical_abortions, bins = bins)
+    pal_medical <- colorBin("Greens", domain = abortion_data_year$medical_abortions, bins = bins)
+    pal_restrictions <- colorFactor(
+      palette = c("red", "orange", "yellow"),
+      domain = c("high", "moderate", "low")
+    )
       
     labels <- sprintf(
       "<strong>%s</strong><br/>%g abortions per 1,000 women",
