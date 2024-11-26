@@ -10,9 +10,16 @@ library(DT)
 preRoedata <- read_csv("OG_NationalAndStatePregnancy_PreDobbs_1988-2020.csv")
 postRoedata <- read_csv("OG_MonthlyAbortionProvisionMonthly_2023-2024.csv")
 
+# First, define our valid years (put this before data preprocessing)
+valid_years <- c(
+  seq(1988, 2000, by = 4),  # 1988, 1992, 1996, 2000
+  seq(2005, 2020, by = 1)   # 2005 through 2020
+)
+
 # Pre-process data
 preRoedata1 <- preRoedata %>%
   select(state, year, abortionstotal, abortionratetotal, abortionratiototal) %>%
+  filter(year %in% valid_years) %>%  # Only keep valid years
   mutate(
     clinical_abortions = abortionstotal * 0.6,  # Adjust these proportions based on actual data
     medical_abortions = abortionstotal * 0.4,
@@ -132,6 +139,13 @@ server <- function(input, output, session) {
   
   # Reactive filtered data based on selected year
   filtered_data <- reactive({
+    req(input$year)
+    
+    # Ensure we're only working with valid years
+    if (!input$year %in% valid_years) {
+      return(NULL)
+    }
+    
     data <- abortion_data_geom %>%
       filter(year == input$year)
     
@@ -160,6 +174,7 @@ server <- function(input, output, session) {
   # Map rendering
   output$map <- renderLeaflet({
     req(input$year)
+    req(input$year %in% valid_years)  # Only proceed if year is valid
     
     abortion_data_year <- abortion_data_geom %>%
       filter(year == input$year)
@@ -245,29 +260,25 @@ server <- function(input, output, session) {
   
   # Data table rendering
   output$stateTable <- DT::renderDataTable({
-    # Debug print statements
-    print("Starting data table render")
-    print(names(filtered_data()))  # This will show us available columns
+    req(input$year)
+    req(input$year %in% valid_years)  # Only proceed if year is valid
     
-    data <- filtered_data() %>%
-      as.data.frame() %>%
-      # Only select columns we know exist from our data preprocessing
+    data <- filtered_data()
+    
+    if (is.null(data)) {
+      return(NULL)
+    }
+    
+    data %>%
       select(name, abortionstotal, clinical_abortions, medical_abortions, restriction_level) %>%
-      mutate(
-        across(where(is.numeric), ~replace_na(., 0))
+      mutate(across(where(is.numeric), ~replace_na(., 0))) %>%
+      rename(
+        "State" = name,
+        "Total Abortions" = abortionstotal,
+        "Clinical Abortions" = clinical_abortions,
+        "Medical Abortions" = medical_abortions,
+        "Restriction Level" = restriction_level
       )
-    
-    print("Data after processing:")
-    print(head(data))  # This will show us the first few rows
-    
-    DT::datatable(
-      data,
-      options = list(
-        pageLength = 10,
-        scrollX = TRUE
-      ),
-      rownames = FALSE
-    )
   })
 }
 
