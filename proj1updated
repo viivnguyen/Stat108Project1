@@ -49,18 +49,20 @@ statenames <- read_csv("state_names.csv") %>%
 
 states <- full_join(states, statenames, by = c("name" = "State"))
 
+
 # Merge geometry with abortion data
 abortion_data_geom <- left_join(abortion_data1, states, by = c("state" = "Alpha code"))
 
 # Ensure geometry column exists and convert to sf object
 abortion_data_geom <- st_as_sf(abortion_data_geom)
 
+print(names(abortion_data_geom))
+
 # UI
 ui <- fluidPage(
   titlePanel("Abortion Data by State"),
   p("This interactive Shiny app utilizes data about abortion before and after the overturn of Roe v. Wade"),
-  p("Users can select the state, year, and degree of restriction ."),
-  
+  p("Users can select the state, year, and degree of restriction."),
   
   sidebarLayout(
     sidebarPanel(
@@ -72,31 +74,23 @@ ui <- fluidPage(
                   sep = ""),
       
       selectInput("state", "State:",
-                  choices = unique(abortion_data_geom$name)),
+                  choices = unique(abortion_data_geom$name),
+                  multiple = TRUE),
       
-      selectInput("restrictionLevel", "Restriction Level:",
+      selectInput("status", "Restriction Level:",
                   choices = unique(state_policies1$Status)),
       
       hr(),
       
       helpText("This dashboard visualizes abortion data across the United States. Use the slider to select a year and the dropdown to choose a specific state.")
-    )
-  )
-),
-    
+    ),
     mainPanel(
       tabsetPanel(
         tabPanel("Map", 
-                 checkboxGroupInput("mapLayers", "Map Layers:",
-                                    choices = c(
-                                      "Total Abortions" = "total",
-                                      "Restriction Levels" = "restrictions"
-                                    ),
-                                    selected = "total"),
                  leafletOutput("map", height = "600px"),
                  hr(),
                  h4("About the Map"),
-                 p("This map shows multiple layers of abortion-relatcting state-level abortion policies. After the ruling, several states implemented near-total bans, which has led to shifts in abortion access and corresponding rate changes across the country.")
+                 p("This map shows multiple layers of abortion-related state-level abortion policies. After the ruling, several states implemented near-total bans, which has led to shifts in abortion access and corresponding rate changes across the country.")
         ),
         tabPanel("Data Table", 
                  h3("State-by-State Abortion Data"),
@@ -107,7 +101,8 @@ ui <- fluidPage(
                  p("Abortion rates, ratios, and totals vary significantly between states due to a complex interplay of factors. These include the availability of healthcare facilities, state-level legislative restrictions, population demographics, and proximity to states with different abortion laws. For instance, some states have seen increased demand for abortion services due to residents from nearby states with stricter regulations traveling across borders for care."),
                  p("The overturning of Roe v. Wade in June 2022 led to increased variability in abortion access across the United States. This table helps provide insight into the impact of policy changes over time, including reductions in access in some areas and increases in others where laws remain more permissive.")
         )
-     )
+      )
+    )
   )
 )
 
@@ -125,13 +120,13 @@ server <- function(input, output, session) {
       filter(year == input$year)
     
     filtered <- filtered %>%
-      filter(Status == input$restrictionLevel)
+      filter(Status == input$status)
     
-    # Check if restriction level input is available and if it's not "all"
-    req(input$restrictionLevel)
-    if (input$restrictionLevel != "all") {
+    # Check if status input is available and if it's not "all"
+    req(input$status)
+    if (input$status != "all") {
       filtered <- filtered %>%
-        filter(restriction_level == input$restrictionLevel)
+        filter(restriction_level == input$status)
     }
     
     # Return NULL if no rows are left after filtering
@@ -148,7 +143,7 @@ server <- function(input, output, session) {
     data <- filtered_data()
     
     # Check if the filtered data is NULL (meaning no data available for that year)
-    if (is.null(data)) {
+    if (is.null(data) || !"geometry" %in% names(data)) {
       # If no data, show an empty Leaflet map with a warning label
       leaflet() %>%
         setView(-96, 37.8, zoom = 4) %>%
@@ -158,18 +153,18 @@ server <- function(input, output, session) {
                    className = "info-control")
     } else {
       # Proceed to create the map with filtered data
-      pal <- colorBin("YlOrRd", domain = data$abortionratetotal, bins = bins)
+      pal <- colorBin("YlOrRd", domain = data$abortionstotal, bins = bins)
       
       labels <- sprintf(
-        "<strong>%s</strong><br/>%g abortions per 1,000 women",
-        data$name, data$abortionratetotal
+        "<strong>%s</strong><br/>%g total abortions",
+        data$name, data$abortionstotal
       ) %>% lapply(htmltools::HTML)
       
       leaflet(data) %>%
         setView(-96, 37.8, zoom = 4) %>%
         addProviderTiles(providers$CartoDB.Positron) %>%
         addPolygons(
-          fillColor = ~pal(abortionratetotal),
+          fillColor = ~pal(abortionstotal),
           weight = 2,
           opacity = 1,
           color = "white",
@@ -186,8 +181,8 @@ server <- function(input, output, session) {
             style = list("font-weight" = "normal", padding = "3px 8px"),
             textsize = "15px",
             direction = "auto")) %>%
-        addLegend(pal = pal, values = ~abortionratetotal, opacity = 0.7,
-                  title = "Abortion Rate", position = "bottomright")
+        addLegend(pal = pal, values = ~abortionstotal, opacity = 0.7,
+                  title = "Total Abortions", position = "bottomright")
     }
   })
   
