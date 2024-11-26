@@ -8,9 +8,9 @@ library(leaflet)
 library(DT)
 
 # Load data
-preRoedata <- read_csv("NationalAndStatePregnancy_PublicUse.csv")
-postRoedata <- read_csv("MonthlyAbortionProvisionMonthly_2023-2024.csv")
-state_policies <- read_csv("AbortionStatePolicies.csv", show_col_types = FALSE)
+preRoedata <- read_csv("OG_NationalAndStatePregnancy_PreDobbs_1988-2020.csv")
+postRoedata <- read_csv("OG_MonthlyAbortionProvisionMonthly_2023-2024.csv")
+state_policies <- read_csv("OG_AbortionStatePolicies.csv", show_col_types = FALSE)
 
 valid_years <- c(
   seq(1988, 2000, by = 4),  # 1988, 1992, 1996, 2000
@@ -67,10 +67,6 @@ ui <- fluidPage(
       selectInput("year", "Select Year:",
                   choices = valid_years,
                   selected = min(valid_years)),
-      
-      selectInput("state", "State:",
-                  choices = unique(abortion_data_geom$name),
-                  multiple = TRUE),
       
       selectInput("status", "Restriction Level:",
                   choices = c("All" = "all", unique(state_policies1$Status))),
@@ -145,7 +141,7 @@ server <- function(input, output, session) {
   output$lineGraph <- renderPlot({
     data <- filtered_line_data()
     
-    ggplot(data, aes(x = year, y = abortionstotal, color = state)) +
+    ggplot(data, aes(x = year, y = abortionratetotal, color = state)) +
       geom_line(size = 1) +
       labs(title = "Total Abortions Over Time by State",
            x = "Year",
@@ -169,18 +165,18 @@ server <- function(input, output, session) {
                    className = "info-control")
     } else {
       # Proceed to create the map with filtered data
-      pal <- colorBin("YlOrRd", domain = data$abortionstotal, bins = bins, na.color = "transparent")
+      pal <- colorBin("YlOrRd", domain = data$abortionratetotal, bins = bins, na.color = "transparent")
       
       labels <- sprintf(
         "<strong>%s</strong><br/>%g total abortions",
-        data$name, data$abortionstotal
+        data$name, data$abortionratetotal
       ) %>% lapply(htmltools::HTML)
       
       leaflet(data) %>%
         setView(-96, 37.8, zoom = 4) %>%
         addProviderTiles(providers$CartoDB.Positron) %>%
         addPolygons(
-          fillColor = ~pal(abortionstotal),
+          fillColor = ~pal(abortionratetotal),
           weight = 2,
           opacity = 1,
           color = "white",
@@ -197,7 +193,7 @@ server <- function(input, output, session) {
             style = list("font-weight" = "normal", padding = "3px 8px"),
             textsize = "15px",
             direction = "auto")) %>%
-        addLegend(pal = pal, values = ~abortionstotal, opacity = 0.7,
+        addLegend(pal = pal, values = ~abortionratetotal, opacity = 0.7,
                   title = "Total Abortions", position = "bottomright")
     }
   })
