@@ -98,7 +98,10 @@ ui <- fluidPage(
                              multiple = TRUE),
                  plotOutput("lineGraph"),
                  hr(),
-                 h4("About the Graph")),
+                 h4("About the Graph"),
+                 p("This line graph visualizes abortion trends over time for selected states. The graph shows data points for years where data is available: every four years from 1988-2000, and annually from 2005-2020. Gaps in the lines indicate periods where data was not collected or is unavailable."),
+                 p("The ability to select multiple states allows for direct comparisons of abortion trends across different regions to identify patterns in access and policy impacts over time.")
+        ),
         tabPanel("Data Table", 
                  h3("State-by-State Abortion Data"),
                  DT::dataTableOutput("stateTable"),
