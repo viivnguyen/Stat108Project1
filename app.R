@@ -77,13 +77,9 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      sliderInput("year", "Select Year:",
-                  min = min(available_years),
-                  max = max(available_years),
-                  value = min(available_years),
-                  step = NULL,  # Remove step
-                  choices = available_years,  # Only show available years
-                  sep = ""),
+      selectInput("year", "Select Year:",
+                  choices = valid_years,
+                  selected = min(valid_years)),
       
       selectInput("state", "State:",
                   choices = unique(abortion_data_geom$name)),
