@@ -10,7 +10,7 @@ library(DT)
 preRoedata <- read_csv("OG_NationalAndStatePregnancy_PreDobbs_1988-2020.csv")
 postRoedata <- read_csv("OG_MonthlyAbortionProvisionMonthly_2023-2024.csv")
 
-# First, define our valid years (put this before data preprocessing)
+# Define valid years first
 valid_years <- c(
   seq(1988, 2000, by = 4),  # 1988, 1992, 1996, 2000
   seq(2005, 2020, by = 1)   # 2005 through 2020
