@@ -19,7 +19,7 @@ valid_years <- c(
 
 # Data Wrangling
 preRoedata1 <- preRoedata %>%
-  select(state, year, abortionstotal) %>%
+  select(state, year, abortionstotal, abortionratetotal, abortionratiototal) %>%
   filter(year %in% valid_years)
 
 postRoedata$year <- year(mdy(postRoedata$month))
@@ -119,14 +119,18 @@ server <- function(input, output, session) {
     filtered <- abortion_data_geom %>%
       filter(year == input$year)
     
-    filtered <- filtered %>%
-      filter(Status == input$status)
-    
-    # Check if status input is available and if it's not "all"
-    req(input$status)
-    if (input$status != "all") {
+    if ("Status" %in% names(filtered) && !is.null(input$status)) {
       filtered <- filtered %>%
-        filter(restriction_level == input$status)
+        filter(Status == input$status)
+    }
+    
+    if (!is.null(input$state) && length(input$state) > 0) {
+      if ("name" %in% names(filtered)) {
+        filtered <- filtered %>%
+          filter(name %in% input$state)
+      } else {
+        print("Error: 'name' column not found in filtered data.")
+      }
     }
     
     # Return NULL if no rows are left after filtering
@@ -153,7 +157,7 @@ server <- function(input, output, session) {
                    className = "info-control")
     } else {
       # Proceed to create the map with filtered data
-      pal <- colorBin("YlOrRd", domain = data$abortionstotal, bins = bins)
+      pal <- colorBin("YlOrRd", domain = data$abortionstotal, bins = bins, na.color = "transparent")
       
       labels <- sprintf(
         "<strong>%s</strong><br/>%g total abortions",
