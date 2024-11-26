@@ -167,7 +167,7 @@ ui <- fluidPage(
                  h4("Data Citation"),
                  p("If you use this data in your work, please cite the sources as follows:"),
                  tags$ul(
-                   tags$li("Guttmacher Institute, \"National and State Pregnancy Data (1973-2020)\". Available from: ", tags$a(href = "hhttps://www.guttmacher.org/report/pregnancies-births-abortions-in-united-states-1973-2020", "National and State Pregnancy Data")),
+                   tags$li("Guttmacher Institute, \"National and State Pregnancy Data (1973-2020)\". Available from: ", tags$a(href = "https://www.guttmacher.org/report/pregnancies-births-abortions-in-united-states-1973-2020", "National and State Pregnancy Data")),
                    tags$li("Abortion State Policies, Guttmacher Institute (2024). Available from: ", tags$a(href = "https://www.guttmacher.org/state-policy/explore/abortion-policy-absence-roe", "Abortion State Policies Data")),
                  ),
         )
