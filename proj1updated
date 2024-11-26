@@ -10,11 +10,17 @@ library(DT)
 # Load data
 preRoedata <- read_csv("NationalAndStatePregnancy_PublicUse.csv")
 postRoedata <- read_csv("MonthlyAbortionProvisionMonthly_2023-2024.csv")
+state_policies <- read_csv("AbortionStatePolicies.csv", show_col_types = FALSE)
+
+valid_years <- c(
+  seq(1988, 2000, by = 4),  # 1988, 1992, 1996, 2000
+  seq(2005, 2020, by = 1)   # 2005 through 2020
+)
 
 # Data Wrangling
-# Pre-process data
 preRoedata1 <- preRoedata %>%
-  select(state, year, abortionstotal, abortionratetotal, abortionratiototal)
+  select(state, year, abortionstotal) %>%
+  filter(year %in% valid_years)
 
 postRoedata$year <- year(mdy(postRoedata$month))
 
@@ -29,6 +35,10 @@ abortion_data1 <- abortion_data %>%
   mutate(abortionstotal = coalesce(abortionstotal.x, abortionstotal.y)) %>%
   select(-abortionstotal.x, -abortionstotal.y) %>%
   arrange(state, year)
+
+state_policies1 <- state_policies %>%
+  select(State, 'Status of Abortion') %>%
+  rename(Status = 'Status of Abortion')
 
 # Load state geometry data
 states <- sf::read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson")
@@ -65,15 +75,14 @@ ui <- fluidPage(
                   choices = unique(abortion_data_geom$name)),
       
       selectInput("restrictionLevel", "Restriction Level:",
-                  choices = c("All Levels" = "all",
-                              "Highly Restrictive" = "high",
-                              "Moderately Restrictive" = "moderate",
-                              "Less Restrictive" = "low")),
+                  choices = unique(state_policies1$Status)),
       
       hr(),
       
       helpText("This dashboard visualizes abortion data across the United States. Use the slider to select a year and the dropdown to choose a specific state.")
-    ),
+    )
+  )
+),
     
     mainPanel(
       tabsetPanel(
@@ -98,8 +107,7 @@ ui <- fluidPage(
                  p("Abortion rates, ratios, and totals vary significantly between states due to a complex interplay of factors. These include the availability of healthcare facilities, state-level legislative restrictions, population demographics, and proximity to states with different abortion laws. For instance, some states have seen increased demand for abortion services due to residents from nearby states with stricter regulations traveling across borders for care."),
                  p("The overturning of Roe v. Wade in June 2022 led to increased variability in abortion access across the United States. This table helps provide insight into the impact of policy changes over time, including reductions in access in some areas and increases in others where laws remain more permissive.")
         )
-      )
-    )
+     )
   )
 )
 
@@ -115,6 +123,9 @@ server <- function(input, output, session) {
     # Filter data based on year
     filtered <- abortion_data_geom %>%
       filter(year == input$year)
+    
+    filtered <- filtered %>%
+      filter(Status == input$restrictionLevel)
     
     # Check if restriction level input is available and if it's not "all"
     req(input$restrictionLevel)
