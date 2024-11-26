@@ -97,7 +97,7 @@ ui <- fluidPage(
       
       hr(),
       
-      helpText("This dashboard visualizes abortion data across the United States. Use the slider to select a year and the dropdown to choose a specific state.")
+      helpText("This dashboard visualizes abortion data across the United States. Select a year and the dropdown to choose a specific state.")
     ),
     
     mainPanel(
