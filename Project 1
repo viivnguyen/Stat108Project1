@@ -58,9 +58,10 @@ abortion_data_geom <- st_as_sf(abortion_data_geom)
 
 # UI
 ui <- fluidPage(
-  titlePanel("Abortion Data by State"),
-  p("This interactive Shiny app utilizes data about abortion before and after the overturn of Roe v. Wade"),
-  p("Users can select the state, year, and degree of restriction."),
+  titlePanel("State-Level Abortion Data and Policy Analysis"),
+  p("This interactive Shiny app provides insights into abortion trends across U.S. states"),
+  p("Users can explore state-specific abortion rates, totals, and policy impacts by selecting year, state, and restriction level."),
+
   
   sidebarLayout(
     sidebarPanel(
@@ -68,13 +69,15 @@ ui <- fluidPage(
                   choices = valid_years,
                   selected = min(valid_years)),
       
-      selectInput("status", "Restriction Level:",
+      selectInput("status", "Current Restriction Level:",
                   choices = c("All" = "all", unique(state_policies1$Status))),
       
       hr(),
       
-      helpText("This dashboard visualizes abortion data across the United States. Use the slider to select a year and the dropdown to choose a specific state.")
+      helpText("Use the above filters to explore changes in abortion rates over time and group states by their current restriction level."),
+      helpText("The selection of year and restriction level will dynamically update the map, graphs, and data table to provide targeted insights into abortion trends in the United States.")
     ),
+    
     mainPanel(
       tabsetPanel(
         tabPanel("Map", 
@@ -93,6 +96,7 @@ ui <- fluidPage(
                  plotOutput("lineGraph"),
                  hr(),
                  h4("About the Graph")
+                 p()
         ),
         
         tabPanel("Data Table", 
@@ -103,6 +107,28 @@ ui <- fluidPage(
                  p("This table provides detailed abortion statistics for each state in the selected year. You can sort and search the data using the table controls."),
                  p("Abortion rates, ratios, and totals vary significantly between states due to a complex interplay of factors. These include the availability of healthcare facilities, state-level legislative restrictions, population demographics, and proximity to states with different abortion laws. For instance, some states have seen increased demand for abortion services due to residents from nearby states with stricter regulations traveling across borders for care."),
                  p("The overturning of Roe v. Wade in June 2022 led to increased variability in abortion access across the United States. This table helps provide insight into the impact of policy changes over time, including reductions in access in some areas and increases in others where laws remain more permissive.")
+        ),
+        
+        tabPanel("Data Information", 
+                 h3("Meta Information About the Data"),
+                 h4("Data Sources"),
+                 p("The data used in this dashboard comes from multiple sources, including public and private research institutions."),
+                 tags$ul(
+                   tags$li("National and State Pregnancy Data: ", tags$a(href = "https://example.com/national-state-pregnancy", "NationalAndStatePregnancy_PublicUse.csv")),
+                   tags$li("Monthly Abortion Provision Data: ", tags$a(href = "https://example.com/monthly-abortion-provision", "MonthlyAbortionProvisionMonthly_2023-2024.csv")),
+                   tags$li("State Abortion Policies Data: ", tags$a(href = "https://example.com/abortion-state-policies", "AbortionStatePolicies.csv")),
+                   tags$li("State Names Data: ", tags$a(href = "https://example.com/state-names", "state_names.csv"))
+                 ),
+                 h4("Data Citation"),
+                 p("If you use this data in your work, please cite the sources as follows:"),
+                 tags$ul(
+                   tags$li("Guttmacher Institute, \"National and State Pregnancy Data\" (2024). Available from: ", tags$a(href = "https://example.com/national-state-pregnancy", "National and State Pregnancy Data")),
+                   tags$li("Abortion Monthly Data, Guttmacher Institute, (2023-2024). Available from: ", tags$a(href = "https://example.com/monthly-abortion-provision", "Monthly Abortion Provision Data")),
+                   tags$li("Abortion State Policies, Guttmacher Institute (2024). Available from: ", tags$a(href = "https://example.com/abortion-state-policies", "Abortion State Policies Data"))
+                 ),
+                 h4("Data Limitations"),
+                 p("The data used in this application comes from a variety of sources and has certain limitations. It may be affected by underreporting or estimation issues. The provided data may also be subject to state-specific reporting regulations and should be used in consideration of its potential limitations."),
+                 p("The data for abortion policies might not always reflect real-time changes in state policies as they are updated periodically.")
         )
       )
     )
@@ -147,7 +173,8 @@ server <- function(input, output, session) {
            x = "Year",
            y = "Total Abortions",
            color = "State") +
-      theme_minimal()
+      theme_minimal() +
+      theme(legend.position = "bottom", legend.title = element_text(face = "bold"))
   })
   
   output$map <- renderLeaflet({
