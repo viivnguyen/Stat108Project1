@@ -8,8 +8,7 @@ library(leaflet)
 library(DT)
 
 # Load data
-preRoedata <- read_csv("NationalAndStatePregnancy_PublicUse.csv")
-postRoedata <- read_csv("MonthlyAbortionProvisionMonthly_2023-2024.csv")
+abortiondata <- read_csv("NationalAndStatePregnancy_PublicUse.csv")
 state_policies <- read_csv("AbortionStatePolicies.csv")
 
 valid_years <- c(
@@ -18,22 +17,9 @@ valid_years <- c(
 )
 
 # Data Wrangling
-preRoedata1 <- preRoedata %>%
+abortiondata1 <- abortiondata %>%
   select(state, year, abortionstotal, abortionratetotal, abortionratiototal) %>%
-  filter(year %in% valid_years)
-
-postRoedata$year <- year(mdy(postRoedata$month))
-
-postRoedata1 <- postRoedata %>%
-  select(state, year, median) %>%
-  group_by(state, year) %>%
-  summarize(abortionstotal = sum(median))
-
-abortion_data <- full_join(preRoedata1, postRoedata1, by = c("state", "year"))
-
-abortion_data1 <- abortion_data %>%
-  mutate(abortionstotal = coalesce(abortionstotal.x, abortionstotal.y)) %>%
-  select(-abortionstotal.x, -abortionstotal.y) %>%
+  filter(year %in% valid_years) %>%
   arrange(state, year)
 
 state_policies1 <- state_policies %>%
@@ -75,7 +61,7 @@ ui <- fluidPage(
       hr(),
       
       helpText("Use the above filters to explore changes in abortion rates over time and group states by their current restriction level."),
-      helpText("The selection of year and restriction level will dynamically update the map, graphs, and data table to provide targeted insights into abortion trends in the United States.")
+      helpText("The selection of year and restriction level will dynamically update the map, graphs, and data table to provide insights into abortion trends in the United States.")
     ),
     
     mainPanel(
@@ -95,8 +81,9 @@ ui <- fluidPage(
                              multiple = TRUE),
                  plotOutput("lineGraph"),
                  hr(),
-                 h4("About the Graph")
-                 p()
+                 h4("About the Graph"),
+                 p("This line graph visualizes abortion trends over time for selected states. The graph shows data points for years where data is available: every four years from 1988-2000, and annually from 2005-2020. Gaps in the lines indicate periods where data was not collected or is unavailable."),
+                 p("The ability to select multiple states allows for direct comparisons of abortion trends across different regions to identify patterns in access and policy impacts over time.")
         ),
         
         tabPanel("Data Table", 
@@ -109,26 +96,22 @@ ui <- fluidPage(
                  p("The overturning of Roe v. Wade in June 2022 led to increased variability in abortion access across the United States. This table helps provide insight into the impact of policy changes over time, including reductions in access in some areas and increases in others where laws remain more permissive.")
         ),
         
-        tabPanel("Data Information", 
-                 h3("Meta Information About the Data"),
+        tabPanel("Meta Information About the Data", 
                  h4("Data Sources"),
-                 p("The data used in this dashboard comes from multiple sources, including public and private research institutions."),
                  tags$ul(
-                   tags$li("National and State Pregnancy Data: ", tags$a(href = "https://example.com/national-state-pregnancy", "NationalAndStatePregnancy_PublicUse.csv")),
-                   tags$li("Monthly Abortion Provision Data: ", tags$a(href = "https://example.com/monthly-abortion-provision", "MonthlyAbortionProvisionMonthly_2023-2024.csv")),
-                   tags$li("State Abortion Policies Data: ", tags$a(href = "https://example.com/abortion-state-policies", "AbortionStatePolicies.csv")),
-                   tags$li("State Names Data: ", tags$a(href = "https://example.com/state-names", "state_names.csv"))
-                 ),
+                   tags$li("National and State Pregnancy Data, 1973-2020: ", tags$a(href = "https://www.guttmacher.org/report/pregnancies-births-abortions-in-united-states-1973-2020", "NationalAndStatePregnancy_PublicUse.csv")),
+                   tags$li("State Abortion Policies Data: ", tags$a(href = "https://www.guttmacher.org/state-policy/explore/abortion-policy-absence-roe", "AbortionStatePolicies.csv")),
+                   ),
+                 h4("Data Information"),
+                 p("This data was collected by the Guttmacher Institute, a research organization focused on reproductive health policy in the U.S."), 
+                 p("For our quantitative data, we looked at historical statistics collected by Guttmacher between 1973-2020. While the original dataset contained information about the number of and rates of pregnancies, birth, and adoption for people of all reproductive ages in the U.S., we subsetted the data to focus on just the abortion rates and total number of abortions, covering women ages 15-44. However, because we wanted to compare state-by-state level analysis, we filtered out the years in which Guttmacher collected only national-wide data."),
+                 p("Additionally, we wanted to compare the state's current policies with the abortion trends over the years leading up to the overturn of Roe v. Wade. The categories of abortion status were created by Guttmacher based on the state's current laws, as of October 7th, 2024. In order of least to most restrictive, the order goes: No Gestational Limits, Gestational limit at or near visibility, Gestational limit between 15 and 22 weeks LMP, Gestational limit between 6 and 12 weeks LMP, Abortion banned"),
                  h4("Data Citation"),
                  p("If you use this data in your work, please cite the sources as follows:"),
                  tags$ul(
-                   tags$li("Guttmacher Institute, \"National and State Pregnancy Data\" (2024). Available from: ", tags$a(href = "https://example.com/national-state-pregnancy", "National and State Pregnancy Data")),
-                   tags$li("Abortion Monthly Data, Guttmacher Institute, (2023-2024). Available from: ", tags$a(href = "https://example.com/monthly-abortion-provision", "Monthly Abortion Provision Data")),
-                   tags$li("Abortion State Policies, Guttmacher Institute (2024). Available from: ", tags$a(href = "https://example.com/abortion-state-policies", "Abortion State Policies Data"))
+                   tags$li("Guttmacher Institute, \"National and State Pregnancy Data (1973-2020)\". Available from: ", tags$a(href = "hhttps://www.guttmacher.org/report/pregnancies-births-abortions-in-united-states-1973-2020", "National and State Pregnancy Data")),
+                   tags$li("Abortion State Policies, Guttmacher Institute (2024). Available from: ", tags$a(href = "https://www.guttmacher.org/state-policy/explore/abortion-policy-absence-roe", "Abortion State Policies Data")),
                  ),
-                 h4("Data Limitations"),
-                 p("The data used in this application comes from a variety of sources and has certain limitations. It may be affected by underreporting or estimation issues. The provided data may also be subject to state-specific reporting regulations and should be used in consideration of its potential limitations."),
-                 p("The data for abortion policies might not always reflect real-time changes in state policies as they are updated periodically.")
         )
       )
     )
