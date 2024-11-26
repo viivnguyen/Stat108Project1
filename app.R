@@ -93,9 +93,9 @@ ui <- fluidPage(
         tabPanel("Line Graph",
                  h3("Total Abortions Over Time"),
                  selectInput("lineStates", "Select States:",
-                           choices = unique(abortion_data1$state),
-                           selected = unique(abortion_data1$state)[1],
-                           multiple = TRUE),
+                             choices = unique(abortion_data1$state),
+                             selected = unique(abortion_data1$state)[1],
+                             multiple = TRUE),
                  plotOutput("lineGraph"),
                  hr(),
                  h4("About the Graph")),
@@ -171,7 +171,7 @@ server <- function(input, output, session) {
         setView(-96, 37.8, zoom = 4) %>%
         addProviderTiles(providers$CartoDB.Positron) %>%
         addControl(html = "<b>No data available for the selected year and restrictions.</b>", 
-                  position = "topright")
+                   position = "topright")
     } else {
       # Create map with data
       pal <- colorBin("YlOrRd", domain = data$abortionstotal, bins = bins)
@@ -199,8 +199,8 @@ server <- function(input, output, session) {
             bringToFront = TRUE),
           label = labels) %>%
         addLegend(pal = pal, values = ~abortionstotal, 
-                 title = "Total Abortions", 
-                 position = "bottomright")
+                  title = "Total Abortions", 
+                  position = "bottomright")
     }
   })
   
