@@ -47,9 +47,9 @@ abortion_data_geom <- st_as_sf(abortion_data_geom)
 
 # UI
 ui <- fluidPage(
-  theme = shinytheme("flatly"),  # Clean, modern theme
+  theme = shinytheme("flatly"),  
   
-  # Add customization while keeping your content
+  # Add customization
   tags$head(
     tags$style(HTML("
             .title-box { 
@@ -74,92 +74,89 @@ ui <- fluidPage(
             }
         "))
   ),
-    
-    
-    # Wrap your existing title and descriptions in styled divs
-    div(class = "title-box",
-        titlePanel("Abortion Data by State"),
-        div(class = "description-text",
-            p("This interactive Shiny app utilizes data about abortion before and after the overturn of Roe v. Wade"),
-            p("Users can select the state, year, and degree of restriction.")
-        )
+  
+  
+  div(class = "title-box",
+      titlePanel("Abortion Data by State"),
+      div(class = "description-text",
+          p("This interactive Shiny app utilizes data about abortion from 1988-2020."),
+          p("Users can select the state, year, and degree of restriction.")
+      )
+  ),
+  
+  sidebarLayout(
+    sidebarPanel(
+      style = "background-color: white; border-radius: 5px;",
+      div(class = "well",
+          selectInput("year", "Select Year:",
+                      choices = valid_years,
+                      selected = min(valid_years)),
+          
+          selectInput("status", "Restriction Level:",
+                      choices = c("All" = "all", unique(state_policies1$Status)))
+      ),
+      
+      hr(),
+      
+      div(class = "description-text",
+          helpText("This dashboard visualizes abortion data across the United States. Use the dropdown menus to select a year and choose a specific state. LMP stands for after the last menstrual period.")
+      ),
+      
+      actionButton("show_source", "View Source Code")
     ),
     
-    # Keep your existing layout but add styling
-    sidebarLayout(
-      sidebarPanel(
-        style = "background-color: white; border-radius: 5px;",
-        # Your existing inputs with added styling
-        div(class = "well",
-            selectInput("year", "Select Year:",
-                        choices = valid_years,
-                        selected = min(valid_years)),
-            
-            selectInput("status", "Restriction Level:",
-                        choices = c("All" = "all", unique(state_policies1$Status)))
+    mainPanel(
+      tabsetPanel(
+        # Map tab 
+        tabPanel("Abortion Rates Map", 
+                 div(class = "well",
+                     leafletOutput("map", height = "600px"),
+                     hr(),
+                     h4("About the Map", class = "section-title"),
+                     div(class = "description-text",
+                         p("This map shows multiple layers of abortion-related state-level abortion policies. After the ruling, several states implemented near-total bans, which has led to shifts in abortion access and corresponding rate changes across the country.")
+                     )
+                 )
         ),
         
-        hr(),
-        
-        div(class = "description-text",
-            helpText("This dashboard visualizes abortion data across the United States. Use the slider to select a year and the dropdown to choose a specific state.")
+        # Data Table tab 
+        tabPanel("Abortion Information by State", 
+                 div(class = "well",
+                     h3("State-by-State Abortion Data", class = "section-title"),
+                     DT::dataTableOutput("stateTable"),
+                     hr(),
+                     h4("About the Data", class = "section-title"),
+                     div(class = "description-text",
+                         p("This table provides detailed abortion statistics for each state in the selected year. You can sort and search the data using the table controls."),
+                         p("Abortion rates, ratios, and totals vary significantly between states due to a complex interplay of factors. These include the availability of healthcare facilities, state-level legislative restrictions, population demographics, and proximity to states with different abortion laws. For instance, some states have seen increased demand for abortion services due to residents from nearby states with stricter regulations traveling across borders for care."),
+                         p("The overturning of Roe v. Wade in June 2022 led to increased variability in abortion access across the United States. This table helps provide insight into the impact of policy changes over time, including reductions in access in some areas and increases in others where laws remain more permissive.")
+                     )
+                 )
         ),
         
-        actionButton("show_source", "View Source Code")
-      ),
+        # Line Graph tab 
+        tabPanel("Abortions Over Time",
+                 div(class = "well",
+                     h3("Total Abortions Over Time", class = "section-title"),
+                     selectInput("lineStates", "Select States:",
+                                 choices = unique(abortion_data1$state),
+                                 selected = unique(abortion_data1$state)[1],
+                                 multiple = TRUE),
+                     plotOutput("lineGraph"),
+                     hr(),
+                     h4("About the Graph", class = "section-title"),
+                     div(class = "description-text",
+                         p("This line graph shows abortion trends over time for selected states. The data points reflect years where data is available: every four years from 1988-2000, and annually from 2005-2020. Gaps in the lines indicate periods where data was not collected.")
+                     )
+                 )
+        ),
         
-      mainPanel(
-        tabsetPanel(
-          # Map tab - keep your descriptions, add styling
-          tabPanel("Map", 
-                   div(class = "well",
-                       leafletOutput("map", height = "600px"),
-                       hr(),
-                       h4("About the Map", class = "section-title"),
-                       div(class = "description-text",
-                           p("This map shows multiple layers of abortion-related state-level abortion policies. After the ruling, several states implemented near-total bans, which has led to shifts in abortion access and corresponding rate changes across the country.")
-                       )
-                   )
-          ),
-          
-          # Line Graph tab - keep your content, add styling
-          tabPanel("Line Graph",
-                   div(class = "well",
-                       h3("Total Abortions Over Time", class = "section-title"),
-                       selectInput("lineStates", "Select States:",
-                                   choices = unique(abortion_data1$state),
-                                   selected = unique(abortion_data1$state)[1],
-                                   multiple = TRUE),
-                       plotOutput("lineGraph"),
-                       hr(),
-                       h4("About the Graph", class = "section-title"),
-                       div(class = "description-text",
-                           p("This line graph shows abortion trends over time for selected states. The data points reflect years where data is available: every four years from 1988-2000, and annually from 2005-2020. Gaps in the lines indicate periods where data was not collected.")
-                       )
-                   )
-          ),
-          
-          # Data Table tab - keep your descriptions, add styling
-          tabPanel("Data Table", 
-                   div(class = "well",
-                       h3("State-by-State Abortion Data", class = "section-title"),
-                       DT::dataTableOutput("stateTable"),
-                       hr(),
-                       h4("About the Data", class = "section-title"),
-                       div(class = "description-text",
-                           p("This table provides detailed abortion statistics for each state in the selected year. You can sort and search the data using the table controls."),
-                           p("Abortion rates, ratios, and totals vary significantly between states due to a complex interplay of factors. These include the availability of healthcare facilities, state-level legislative restrictions, population demographics, and proximity to states with different abortion laws. For instance, some states have seen increased demand for abortion services due to residents from nearby states with stricter regulations traveling across borders for care."),
-                           p("The overturning of Roe v. Wade in June 2022 led to increased variability in abortion access across the United States. This table helps provide insight into the impact of policy changes over time, including reductions in access in some areas and increases in others where laws remain more permissive.")
-                       )
-                   )
-          ),
-        
-        tabPanel("Meta Information About the Data", 
+        tabPanel("Metadata Information", 
                  h4("Data Sources"),
                  tags$ul(
                    tags$li("National and State Pregnancy Data, 1973-2020: ", tags$a(href = "https://www.guttmacher.org/report/pregnancies-births-abortions-in-united-states-1973-2020", "NationalAndStatePregnancy_PublicUse.csv")),
                    tags$li("State Abortion Policies Data: ", tags$a(href = "https://www.guttmacher.org/state-policy/explore/abortion-policy-absence-roe", "AbortionStatePolicies.csv")),
-                   ),
+                 ),
                  h4("Data Information"),
                  p("This data was collected by the Guttmacher Institute, a research organization focused on reproductive health policy in the U.S."), 
                  p("For our quantitative data, we looked at historical statistics collected by Guttmacher between 1973-2020. While the original dataset contained information about the number of and rates of pregnancies, birth, and adoption for people of all reproductive ages in the U.S., we subsetted the data to focus on just the abortion rates and total number of abortions, covering women ages 15-44. However, because we wanted to compare state-by-state level analysis, we filtered out the years in which Guttmacher collected only national-wide data."),
